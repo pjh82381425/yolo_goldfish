@@ -5,9 +5,12 @@ import time
 import numpy as np
 from collections import defaultdict
 
+realtime = False  # False: 비디오 사용, True: 카메라 사용
+
 # 기본 설정
 model_path = "best.pt"
 tracker_path = "bytetrack.yaml"
+sample_video_path = "sample_video2.mp4"
 resize_shape = (640, 640)
 conf_threshold = 0.35
 duration_limit = 60  # 최대 실행 시간 (초)
@@ -20,16 +23,21 @@ i = 1
 while os.path.exists(os.path.join(base_dir, f"try{i}")):
     i += 1
 try_dir = os.path.join(base_dir, f"try{i}")
-frames_dir = os.path.join(try_dir, "frames")
-os.makedirs(frames_dir, exist_ok=False)
+os.makedirs(try_dir, exist_ok=True)
+
+pred_frames_dir = os.path.join(try_dir, "frames")
+os.makedirs(pred_frames_dir, exist_ok=False)
+
+original_frames_dir = os.path.join(try_dir, "original_frames")
+os.makedirs(original_frames_dir, exist_ok=False)
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 original_video_path = os.path.join(try_dir, "original.mp4")
 original_video_writer = cv2.VideoWriter(original_video_path, fourcc, 30.0, resize_shape)
+
 pred_video_path = os.path.join(try_dir, "prediction.mp4")
 pred_video_writer = cv2.VideoWriter(pred_video_path, fourcc, 30.0, resize_shape)
-original_frames_dir = os.path.join(try_dir, "original_frames")
-os.makedirs(original_frames_dir, exist_ok=True)
+
 coords_txt_path = os.path.join(try_dir, "coordinates.txt")
 info_txt_path = os.path.join(try_dir, "info.txt")
 
@@ -39,6 +47,8 @@ with open(info_txt_path, 'w') as f:
     f.write(f"resize_shape: {resize_shape}\n")
     f.write(f"conf_threshold: {conf_threshold}\n")
     f.write(f"duration_limit: {duration_limit}\n")
+    f.write(f"realtime: {realtime}\n")
+    f.write(f"sample_video: {sample_video_path}\n")
 
 # 좌표 텍스트 초기화
 with open(coords_txt_path, 'w') as f:
@@ -46,7 +56,11 @@ with open(coords_txt_path, 'w') as f:
 
 # 모델 및 비디오 로드
 model = YOLO(model_path)
-cap = cv2.VideoCapture(0)
+
+if realtime == False:
+    cap = cv2.VideoCapture(sample_video_path)
+else:
+    cap = cv2.VideoCapture(0)
 
 # 트래킹 궤적 저장용
 track_history = defaultdict(list)
@@ -114,15 +128,15 @@ while cap.isOpened():
             cv2.polylines(pred_frame, [pts], isClosed=False, color=(0, 0, 255), thickness=2)
 
         # 프레임 저장
-        frame_file = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
         original_resized = cv2.resize(frame, resize_shape)
         cv2.imwrite(os.path.join(original_frames_dir, f"frame_{frame_count:04d}.png"), original_resized)
         original_video_writer.write(original_resized)
+        cv2.imwrite(os.path.join(pred_frames_dir, f"frame_{frame_count:04d}.png"), pred_frame)
         pred_video_writer.write(pred_frame)
 
-        cv2.imshow("original", original_resized)
+        # cv2.imshow("original", original_resized)
         cv2.imshow("predictions", pred_frame)
-        
+
         if cv2.waitKey(1) & 0xFF == 27:
             print("사용자 ESC로 중단")
             break
@@ -138,6 +152,4 @@ cv2.destroyAllWindows()
 
 # 완료 메시지
 print(f"\n✅ try{i} 저장 완료")
-print(f"📁 frames 디렉토리: {frames_dir}")
-print(f"📄 좌표 텍스트: {coords_txt_path}")
 print(f"🕒 전체 실행 시간: {time.time() - start_time:.2f}초")
