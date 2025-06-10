@@ -5,7 +5,7 @@ import time
 import numpy as np
 from collections import defaultdict
 
-realtime = False  # False: 비디오 사용, True: 카메라 사용
+realtime = True  # False: 비디오 사용, True: 카메라 사용
 
 # 기본 설정
 model_path = "best.pt"
